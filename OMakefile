@@ -1,0 +1,26 @@
+# .SUBDIRS:
+
+PROGRAM = render
+USE_OCAMLFIND = false
+BYTE_ENABLED = true
+NATIVE_ENABLED = false
+
+FILES[] =
+    parser
+    render
+    scene
+
+# OCAML_LIBS = str
+# OCAML_CLIBS +=
+OCAML_OTHER_LIBS = str graphics
+# OCAML_LIB_FLAGS +=
+OCamlProgram($(PROGRAM), $(FILES))
+.DEFAULT: $(PROGRAM)
+
+.PHONY: clean
+clean:
+   rm -f \
+     $(glob $(addsuffix .cm*, $(FILES))) \
+     $(glob $(addsuffix .o, $(FILES))) \
+     $(PROGRAM) $(PROGRAM).opt \
+     $(PROGRAM).run
