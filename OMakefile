@@ -12,6 +12,7 @@ FILES[] =
 
 # OCAML_LIBS = str
 # OCAML_CLIBS +=
+OCAMLFLAGS = -w A -warn-error a
 OCAML_OTHER_LIBS = str graphics
 # OCAML_LIB_FLAGS +=
 OCamlProgram($(PROGRAM), $(FILES))
