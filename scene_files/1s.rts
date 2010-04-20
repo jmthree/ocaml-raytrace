@@ -1,5 +1,5 @@
 ##one sphere with a plane below it
-se d s a 1 0.7
+se d s a 1 0.7 
 ## camera at (-10, 75, 60) looking at origin
 vv -10 75 60 1 -7.5 -6
 cc 0

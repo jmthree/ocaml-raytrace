@@ -12,6 +12,7 @@ let line_to_instr line =
   | ["dm"; r; g; b] -> S.DiffuseMaterialInstr (fos r, fos g, fos b)
   | ["sm"; r; g; b; p] -> S.SpecularMaterialInstr (fos r, fos g, fos b, ios p)
   | ["ss"; i] -> S.SphereInstr (ios i)
+  | ["ps"; i] -> S.PlaneInstr  (ios i)
   | ["cc"; i] -> S.CameraInstr (ios i)
   | ["pl"; idx; inten] -> S.PointLightInstr (ios idx, fos inten)
   | ["dl"; idx; inten] -> S.DirectionalLightInstr (ios idx, fos inten)
@@ -63,6 +64,7 @@ let validate_instructions instrs =
     | S.PointLightInstr _ -> ()
     | S.DirectionalLightInstr _ -> ()
     | S.SpecularMaterialInstr _ -> ()
+    | S.PlaneInstr _ -> ()
     | instr -> failwith ("Invalid instruction: " ^ (instr_to_string instr))
   in
   List.iter validate_instr others
