@@ -13,6 +13,7 @@ type instruction =
   | SpecularMaterialInstr of float * float * float * int
   | SphereInstr of index
   | PlaneInstr of index
+  | TriangleInstr of index * index * index
   | CameraInstr of index
   | PointLightInstr of index * float
   | DirectionalLightInstr of index * float

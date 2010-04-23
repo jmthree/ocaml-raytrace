@@ -4,21 +4,22 @@ let line_to_instr line =
   let split = Str.split (Str.regexp "[ \t]+") in
   let fos = float_of_string in
   let ios = int_of_string in
-  match split line with
-  | "##" :: _ -> S.CommentInstr
-  | ["vv"; x; y; z; dx; dy; dz] ->
-      S.VertexInstr (fos x, fos y, fos z, fos dx, fos dy, fos dz)
-  | ["am"; r; g; b] -> S.AmbientMaterialInstr (fos r, fos g, fos b)
-  | ["dm"; r; g; b] -> S.DiffuseMaterialInstr (fos r, fos g, fos b)
-  | ["sm"; r; g; b; p] -> S.SpecularMaterialInstr (fos r, fos g, fos b, ios p)
-  | ["ss"; i] -> S.SphereInstr (ios i)
-  | ["ps"; i] -> S.PlaneInstr  (ios i)
-  | ["cc"; i] -> S.CameraInstr (ios i)
-  | ["pl"; idx; inten] -> S.PointLightInstr (ios idx, fos inten)
-  | ["dl"; idx; inten] -> S.DirectionalLightInstr (ios idx, fos inten)
-  | ["se"; d; sp; sh; r; a] ->
-      S.SettingsInstr (d = "d", sp = "s", sh = "a", ios r, fos a)
-  | _ -> S.IgnoreInstr line
+    match split line with
+      | "##" :: _ -> S.CommentInstr
+      | ["vv"; x; y; z; dx; dy; dz] ->
+          S.VertexInstr (fos x, fos y, fos z, fos dx, fos dy, fos dz)
+      | ["am"; r; g; b] -> S.AmbientMaterialInstr (fos r, fos g, fos b)
+      | ["dm"; r; g; b] -> S.DiffuseMaterialInstr (fos r, fos g, fos b)
+      | ["sm"; r; g; b; p] -> S.SpecularMaterialInstr (fos r, fos g, fos b, ios p)
+      | ["ss"; i] -> S.SphereInstr (ios i)
+      | ["ps"; i] -> S.PlaneInstr  (ios i)
+      | ["ts"; i; j; k] -> S.TriangleInstr (ios i, ios j, ios k)
+      | ["cc"; i] -> S.CameraInstr (ios i)
+      | ["pl"; idx; inten] -> S.PointLightInstr (ios idx, fos inten)
+      | ["dl"; idx; inten] -> S.DirectionalLightInstr (ios idx, fos inten)
+      | ["se"; d; sp; sh; r; a] ->
+          S.SettingsInstr (d = "d", sp = "s", sh = "a", ios r, fos a)
+      | _ -> S.IgnoreInstr line
 
 let instr_to_string instr = match instr with
   | S.CommentInstr    -> "Comment"
@@ -65,7 +66,8 @@ let validate_instructions instrs =
     | S.DirectionalLightInstr _ -> ()
     | S.SpecularMaterialInstr _ -> ()
     | S.PlaneInstr _ -> ()
+    | S.TriangleInstr _ -> ()
     | instr -> failwith ("Invalid instruction: " ^ (instr_to_string instr))
   in
-  List.iter validate_instr others
+    List.iter validate_instr others
 

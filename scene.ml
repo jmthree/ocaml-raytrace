@@ -2,6 +2,7 @@
 module Vector = struct
   type vector = float * float * float
 
+  let values (x, y, z) = (x, y, z)
   let cross (x1, y1, z1) (x2, y2, z2) =
     (y1 *. z2 -. z1 *. y2,
      z1 *. x2 -. x1 *. z2,
@@ -41,6 +42,7 @@ type instruction =
   | SpecularMaterialInstr of float * float * float * int
   | SphereInstr of int
   | PlaneInstr of index
+  | TriangleInstr of index * index * index
   | CameraInstr of int
   | PointLightInstr of index * float
   | DirectionalLightInstr of index * float
@@ -62,6 +64,7 @@ type light =
 type element =
   | Sphere of index * fcolor * fcolor * (fcolor * int)
   | Plane of index * fcolor * fcolor * (fcolor * int)
+  | Triangle of index * index * index * fcolor * fcolor * (fcolor * int)
 
 type camera = { idx : index;
                 frame_x : int;
@@ -78,6 +81,31 @@ type scene = { vertexes : vertex array;
                camera   : camera;
                settings : settings;
                elements : element list }
+
+let element_to_string vertexes =
+  let get_vertex = Array.get vertexes in function
+    | Sphere (idx, _, _, _) ->
+        let {pos = (x, y, z); dir = _} = get_vertex idx in
+          Printf.sprintf "Sphere : %d : %.2f %.2f %.2f" idx x y z
+    | Plane (idx, _, _, _) ->
+        let {pos = (x, y, z); dir = _} = get_vertex idx in
+          Printf.sprintf "Plane : %d : %.2f %.2f %.2f" idx x y z
+    | Triangle (idxa, idxb, idxc, _, _, _) ->
+        let {pos = a; dir = _} = get_vertex idxa in
+        let {pos = b; dir = _} = get_vertex idxb in
+        let {pos = c; dir = _} = get_vertex idxc in
+          Printf.sprintf "Triangle : %d %d %d: %s %s %s" idxa idxb idxc
+            (Vector.to_string a)
+            (Vector.to_string b)
+            (Vector.to_string c)
+
+let light_to_string vertexes = function
+  | Point (idx, _) ->
+      let {pos = (x, y, z); dir = _} = Array.get vertexes idx in
+      Printf.sprintf "Point : %d : %.2f %.2f %.2f" idx x y z
+  | Directional (idx, _) ->
+      let {pos = _; dir = (x, y, z)} = Array.get vertexes idx in
+      Printf.sprintf "Directional : %d : %.2f %.2f %.2f" idx x y z
 
 let create_scene instrs units_x units_y =
   let ambient_material = ref (0.2, 0.2, 0.2) in
@@ -118,6 +146,13 @@ let create_scene instrs units_x units_y =
           (vtxs, camera, lights, element :: elements)
     | PlaneInstr idx ->
         let element = Plane (idx + 1,
+                             !ambient_material,
+                             !diffuse_material,
+                             !specular_material)
+        in
+          (vtxs, camera, lights, element :: elements)
+    | TriangleInstr (idx1, idx2, idx3) ->
+        let element = Triangle(idx1 + 1, idx2 + 1, idx3 + 1,
                              !ambient_material,
                              !diffuse_material,
                              !specular_material)
@@ -195,8 +230,37 @@ let find_intersect vertexes start direction element =
                 then None
                 else
                     Some t
+      | Triangle (idxa, idxb, idxc, _, _, _) ->
+          let xe, ye, ze = start in
+          let xd, yd, zd = direction in
+          let {pos = (xa, ya, za); dir = _} = get_vertex idxa in
+          let {pos = (xb, yb, zb); dir = _} = get_vertex idxb in
+          let {pos = (xc, yc, zc); dir = _} = get_vertex idxc in
+          let a, d, g, j = (xa -. xb), (xa -. xc), xd, (xa -. xe) in
+          let b, e, h, k = (ya -. yb), (ya -. yc), yd, (ya -. ye) in
+          let c, f, i, l = (za -. zb), (za -. zc), zd, (za -. ze) in
+          let ei_min_hf = e *. i -. h *. f in
+          let gf_min_di = g *. f -. d *. i in
+          let dh_min_eg = d *. h -. e *. g in
+          let m = a *. ei_min_hf +. b *. gf_min_di +. c *. dh_min_eg in
+          let ak_min_jb = a *. k -. j *. b in
+          let jc_min_al = j *. c -. a *. l in
+          let bl_min_kc = b *. l -. k *. c in
+          let t = -1.0 *. (f *. ak_min_jb +. e *. jc_min_al +. d *. bl_min_kc) /. m in
+            if t <= 0.000001
+            then None
+            else
+              let gamma = (i *. ak_min_jb +. h *. jc_min_al +. g *. bl_min_kc) /. m in
+                if gamma < 0.0 || gamma > 1.0
+                then None
+                else
+                  let beta = (j *. ei_min_hf +. h *. gf_min_di +. l *. dh_min_eg) /. m in
+                    if beta < 0.0 || (beta +. gamma) > 1.0
+                    then None
+                    else Some t
 
 let cast_ray_into_scene scene x y =
+  (*let _ = Printf.printf "x %d y %d\n" x y in*)
   let get_vertex = Array.get scene.vertexes in
   let {idx = camera_idx; frame_x = ix; frame_y = iy} = scene.camera in
   let {pos = e; dir = cam_dir} = get_vertex camera_idx in
@@ -262,41 +326,42 @@ let cast_ray_into_scene scene x y =
                  let intersect = find_intersect scene.vertexes e d element in
                    match intersect, accum with
                      | Some t, Some (t', _) ->
+                         (*let _ = print_endline ("New hit: " ^
+                          * (element_to_string scene.vertexes element)) in*)
+                         (*let _ = if t < t' then (print_endline "Replacing last
+                          * hit") else () in*)
                          if t < t' then Some (t, element) else accum
-                     | Some t, _ -> Some (t, element)
+                     | Some t, _ ->
+                         (*let _ = print_endline ("New hit: " ^
+                          * (element_to_string scene.vertexes element)) in*)
+                         (*let _ = (print_endline "Replacing last hit") in*)
+                           Some (t, element)
                      | None, _ -> accum)
               None
               scene.elements
   in
 
-  let is_some = function
-    | Some _ -> true
-    | None -> false
-  in
-
   let calculate_color (intersect, normal, amb_mat, diff_mat, spec_mat) =
     let base = (0.0, 0.0, 0.0) in
     let ambient = ambient_lighting amb_mat in
-    let direction_to_light = function
+    let ray_towards_light = function
       | Directional (idx, _) ->
           let {pos = _; dir = ldir} = get_vertex idx in
-            Vector.invert ldir
+            Vector.invert ldir, infinity
       | Point (idx, _) ->
           let {pos = p; dir = _} = get_vertex idx in
-            Vector.sub p intersect
+            Vector.sub p intersect, 1.0
     in
     let in_shadow light =
-      let direction = direction_to_light light in
+      scene.settings.shadows &&
+      (*let _ = print_endline (light_to_string scene.vertexes light) in*)
+      let direction, endpoint = ray_towards_light light in
+      let p_above = (Vector.add intersect (Vector.mult 0.001 direction)) in
         List.exists
           (fun element ->
-             let above = (Vector.add intersect (Vector.mult 0.001 direction)) in
-             (*let _ = print_endline (Vector.to_string intersect) in
-              let _ = print_endline (Vector.to_string direction) in
-              let _ = print_endline (Vector.to_string above) in *)
-             let hit = find_intersect scene.vertexes above direction element in
-               match hit with
-                 | Some t -> t >= 0.0000001
-                 | None -> false)
+             match find_intersect scene.vertexes p_above direction element with
+               | Some t -> t >= 0.0000001 && t <= endpoint
+               | None -> false)
           scene.elements
     in
     let diff_shade = diffuse_lighting diff_mat normal intersect in
@@ -341,6 +406,12 @@ let cast_ray_into_scene scene x y =
             | Plane  (idx, amb, diff, spec) ->
                 let {pos = _; dir = normal} = get_vertex idx in
                 let normal = Vector.norm normal in
+                  (normal, amb, diff, spec)
+            | Triangle (idxa, idxb, idxc, amb, diff, spec) ->
+                let {pos = a; dir = _} = get_vertex idxa in
+                let {pos = b; dir = _} = get_vertex idxb in
+                let {pos = c; dir = _} = get_vertex idxc in
+                let normal = Vector.cross (Vector.sub c a) (Vector.sub b a) in
                   (normal, amb, diff, spec)
           in
           let r, g, b = calculate_color (intersect, normal, amb, diff, spec) in
